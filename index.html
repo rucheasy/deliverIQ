@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeliverIQ — Route Optimization System</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0a0c10;
+  --surface: #111318;
+  --surface2: #181c24;
+  --border: #232832;
+  --accent: #f5a623;
+  --accent2: #e8533c;
+  --vip: #c084fc;
+  --green: #34d399;
+  --blue: #60a5fa;
+  --text: #e8eaf0;
+  --muted: #6b7280;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── NOISE TEXTURE ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── HEADER ── */
+header {
+  position: sticky; top: 0;
+  background: rgba(10,12,16,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  padding: 0 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px;
+}
+.logo {
+  font-family: var(--sans);
+  font-size: 1.4rem; font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.logo span { color: var(--accent); }
+.header-badge {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 100px;
+  color: var(--muted);
+}
+
+/* ── LAYOUT ── */
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; position: relative; z-index: 1; }
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(245,166,35,0.03) 0%, transparent 60%);
+  pointer-events: none;
+}
+.card-title {
+  font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── STAT CARDS ── */
+.stat-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.stat-value { font-family: var(--mono); font-size: 1.6rem; font-weight: 700; }
+.stat-value.orange { color: var(--accent); }
+.stat-value.purple { color: var(--vip); }
+.stat-value.green  { color: var(--green); }
+.stat-value.blue   { color: var(--blue); }
+
+/* ── FORMS ── */
+.form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+.form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 100px; }
+label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+input, select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+input:focus, select:focus { border-color: var(--accent); }
+input::placeholder { color: var(--muted); }
+select option { background: var(--surface2); }
+
+/* ── BUTTONS ── */
+.btn {
+  font-family: var(--sans);
+  font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.05em;
+  border: none; border-radius: 8px;
+  cursor: pointer;
+  padding: 10px 18px;
+  transition: all 0.18s;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.btn-accent  { background: var(--accent); color: #000; }
+.btn-accent:hover  { background: #f0b845; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,166,35,0.3); }
+.btn-vip    { background: var(--vip); color: #000; }
+.btn-vip:hover    { background: #c084fc; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(192,132,252,0.3); }
+.btn-green  { background: var(--green); color: #000; }
+.btn-green:hover  { background: #4ade80; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(52,211,153,0.3); }
+.btn-blue   { background: var(--blue); color: #000; }
+.btn-blue:hover   { background: #93c5fd; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(96,165,250,0.3); }
+.btn-ghost  { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover  { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: var(--accent2); color: #fff; }
+.btn-danger:hover { opacity: 0.85; }
+.btn-sm { padding: 6px 12px; font-size: 0.72rem; }
+.btn-full { width: 100%; justify-content: center; }
+
+/* ── ALGO BUTTONS ── */
+.algo-btn-row {
+  display: flex; gap: 1rem; flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.algo-card {
+  flex: 1; min-width: 200px;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.algo-card:hover { border-color: var(--accent); }
+.algo-card.active { border-color: var(--accent); background: rgba(245,166,35,0.05); }
+.algo-card .algo-icon { font-size: 1.4rem; margin-bottom: 6px; }
+.algo-card .algo-name { font-weight: 700; font-size: 0.9rem; }
+.algo-card .algo-complexity { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); margin-top: 4px; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+th {
+  font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px; text-align: left;
+}
+td { padding: 9px 12px; border-bottom: 1px solid rgba(35,40,50,0.6); font-family: var(--mono); font-size: 0.8rem; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.badge {
+  display: inline-block;
+  font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 100px;
+}
+.badge-vip    { background: rgba(192,132,252,0.15); color: var(--vip); border: 1px solid rgba(192,132,252,0.3); }
+.badge-normal { background: rgba(107,114,128,0.15); color: var(--muted); border: 1px solid rgba(107,114,128,0.3); }
+.badge-selected { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+
+/* ── ROUTE DISPLAY ── */
+.route-node {
+  display: inline-flex; align-items: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: var(--mono); font-size: 0.78rem;
+  margin: 3px;
+  transition: all 0.2s;
+}
+.route-node.vip { border-color: rgba(192,132,252,0.5); background: rgba(192,132,252,0.05); color: var(--vip); }
+.route-node.depot { border-color: rgba(245,166,35,0.5); background: rgba(245,166,35,0.08); color: var(--accent); font-weight: 700; }
+.route-arrow { color: var(--muted); margin: 0 2px; font-size: 0.8rem; }
+
+/* ── RESULT BLOCK ── */
+.result-block {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem 1.4rem;
+  margin-top: 1rem;
+}
+.result-block h4 { font-size: 0.78rem; font-weight: 700; margin-bottom: 10px; }
+.result-meta { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 10px; }
+.result-meta-item { display: flex; flex-direction: column; gap: 2px; }
+.result-meta-item .lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.result-meta-item .val { font-family: var(--mono); font-size: 0.88rem; font-weight: 700; }
+
+/* ── LOG ── */
+.log-box {
+  background: #070910;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.7;
+  max-height: 240px;
+  overflow-y: auto;
+  color: #8fa0b0;
+}
+.log-box .log-step   { color: var(--blue); }
+.log-box .log-vip    { color: var(--vip); }
+.log-box .log-ok     { color: var(--green); }
+.log-box .log-warn   { color: var(--accent); }
+
+/* ── COMPARISON ── */
+.comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.cmp-box {
+  border-radius: 12px; padding: 1.2rem;
+  border: 1px solid var(--border);
+}
+.cmp-greedy { background: rgba(96,165,250,0.05); border-color: rgba(96,165,250,0.2); }
+.cmp-dijkstra { background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.2); }
+.cmp-box h4 { font-size: 0.78rem; margin-bottom: 10px; }
+.cmp-box .winner { font-family: var(--mono); font-size: 0.7rem; color: var(--accent); margin-top: 8px; }
+
+/* ── SECTION DIVIDER ── */
+.section-header {
+  display: flex; align-items: center; gap: 12px;
+  margin: 2.5rem 0 1.2rem;
+}
+.section-header h2 { font-size: 1.05rem; font-weight: 800; }
+.section-line { flex: 1; height: 1px; background: var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.65rem;
+  color: var(--accent); border: 1px solid rgba(245,166,35,0.3);
+  padding: 2px 8px; border-radius: 100px;
+}
+
+/* ── CANVAS ── */
+.chart-wrap { position: relative; height: 260px; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 2rem; right: 2rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 18px;
+  font-size: 0.82rem; font-family: var(--mono);
+  z-index: 999; transform: translateY(80px); opacity: 0;
+  transition: all 0.3s;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.success { border-color: var(--green); color: var(--green); }
+#toast.error   { border-color: var(--accent2); color: var(--accent2); }
+
+/* ── HERO STAT ROW ── */
+.hero-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1rem; margin-bottom: 2rem;
+}
+
+/* ── EMPTY STATE ── */
+.empty { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 0.8rem; }
+.empty .emoji { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .col-span-2, .col-span-3 { grid-column: span 1; }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); }
+  .comparison-grid { grid-template-columns: 1fr; }
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn 0.3s ease both; }
+
+.pulse-dot {
+  display: inline-block; width: 8px; height: 8px;
+  background: var(--green); border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
+
+/* vip glow */
+.vip-glow { box-shadow: 0 0 16px rgba(192,132,252,0.15); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Deliver<span>IQ</span></div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="pulse-dot"></span>
+    <span class="header-badge">Route Optimization Engine v1.0</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- HERO STATS -->
+  <div class="hero-stats" style="margin-top:1.5rem">
+    <div class="stat-card">
+      <span class="stat-label">Locations</span>
+      <span class="stat-value orange" id="stat-nodes">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Orders</span>
+      <span class="stat-value blue" id="stat-orders">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">VIP Orders</span>
+      <span class="stat-value purple" id="stat-vip">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Edges / Routes</span>
+      <span class="stat-value green" id="stat-edges">0</span>
+    </div>
+  </div>
+
+  <!-- SECTION 1: Graph Setup -->
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <h2>Network Graph Setup</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Add Location (Node)</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Location Name</label>
+          <input type="text" id="node-name" placeholder="e.g. Warehouse A" />
+        </div>
+        <button class="btn btn-accent" onclick="addNode()">+ Add</button>
+      </div>
+      <div style="margin-top:1rem">
+        <div class="card-title" style="margin-bottom:0.6rem"><span class="dot" style="background:var(--blue)"></span>Locations List</div>
+        <div id="node-list" class="empty"><span class="emoji">📍</span>No locations yet</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Add Route (Edge)</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>From</label>
+          <select id="edge-from"><option value="">Select</option></select>
+        </div>
+        <div class="form-group">
+          <label>To</label>
+          <select id="edge-to"><option value="">Select</option></select>
+        </div>
+        <div class="form-group" style="max-width:100px">
+          <label>Distance (km)</label>
+          <input type="number" id="edge-dist" placeholder="10" min="1" />
+        </div>
+        <button class="btn btn-blue" onclick="addEdge()">+ Add</button>
+      </div>
+      <div style="margin-top:1rem">
+        <div class="card-title" style="margin-bottom:0.6rem"><span class="dot" style="background:var(--green)"></span>Edge List</div>
+        <div class="tbl-wrap" style="max-height:150px;overflow-y:auto">
+          <table id="edge-table">
+            <thead><tr><th>From</th><th>To</th><th>Dist.</th><th></th></tr></thead>
+            <tbody id="edge-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: Orders -->
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <h2>Order Management</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--vip)"></span>Add Delivery Order</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Order ID</label>
+        <input type="text" id="o-id" placeholder="ORD-001" />
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <select id="o-loc"><option value="">Select</option></select>
+      </div>
+      <div class="form-group" style="max-width:100px">
+        <label>Weight (kg)</label>
+        <input type="number" id="o-weight" placeholder="5" min="0.1" step="0.1" />
+      </div>
+      <div class="form-group" style="max-width:100px">
+        <label>Profit (₹)</label>
+        <input type="number" id="o-profit" placeholder="200" min="1" />
+      </div>
+      <div class="form-group" style="max-width:110px">
+        <label>Priority</label>
+        <select id="o-priority">
+          <option value="normal">Normal</option>
+          <option value="vip">⭐ VIP</option>
+        </select>
+      </div>
+      <button class="btn btn-vip" onclick="addOrder()">+ Add Order</button>
+    </div>
+    <div style="margin-top:1.2rem">
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Order ID</th><th>Location</th><th>Weight</th><th>Profit</th><th>Priority</th><th></th></tr>
+          </thead>
+          <tbody id="order-body">
+            <tr><td colspan="6" class="empty" style="padding:1.5rem"><span class="emoji">📦</span>No orders added</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Knapsack Config -->
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <h2>Knapsack Configuration</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--green)"></span>0/1 Knapsack — Order Selection</div>
+    <div class="form-row" style="align-items:flex-end">
+      <div class="form-group" style="max-width:180px">
+        <label>Max Capacity (kg)</label>
+        <input type="number" id="knapsack-cap" placeholder="30" min="1" value="30" />
+      </div>
+      <div class="form-group" style="max-width:200px">
+        <label>Depot (Start / End)</label>
+        <select id="depot-select"><option value="">Select depot</option></select>
+      </div>
+      <button class="btn btn-green btn-full" style="max-width:220px" onclick="runKnapsack()">
+        🎒 Run Knapsack Selection
+      </button>
+    </div>
+    <div id="knapsack-result" style="margin-top:1rem"></div>
+  </div>
+
+  <!-- SECTION 4: Algorithm Execution -->
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <h2>Route Algorithm Execution</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="algo-btn-row">
+    <div class="algo-card" id="algo-greedy" onclick="runGreedy()">
+      <div class="algo-icon">⚡</div>
+      <div class="algo-name">Greedy — Nearest Neighbor</div>
+      <div class="algo-complexity">Time: O(n²) &nbsp;·&nbsp; Space: O(n)</div>
+    </div>
+    <div class="algo-card" id="algo-dijkstra" onclick="runDijkstra()">
+      <div class="algo-icon">🔭</div>
+      <div class="algo-name">Dijkstra's Shortest Path</div>
+      <div class="algo-complexity">Time: O((V+E) log V) &nbsp;·&nbsp; Space: O(V)</div>
+    </div>
+    <div class="algo-card" id="algo-both" onclick="runBoth()">
+      <div class="algo-icon">📊</div>
+      <div class="algo-name">Compare Both</div>
+      <div class="algo-complexity">Runs both &amp; benchmarks performance</div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-section" style="display:none">
+
+    <div class="grid-2">
+      <!-- Greedy Result -->
+      <div class="card" id="greedy-card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Greedy Result</div>
+        <div id="greedy-route"></div>
+        <div class="result-meta" id="greedy-meta"></div>
+      </div>
+      <!-- Dijkstra Result -->
+      <div class="card" id="dijkstra-card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Dijkstra Result</div>
+        <div id="dijkstra-route"></div>
+        <div class="result-meta" id="dijkstra-meta"></div>
+      </div>
+    </div>
+
+    <!-- Comparison -->
+    <div class="card" style="margin-top:1.5rem" id="comparison-card">
+      <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Algorithm Comparison</div>
+      <div class="comparison-grid" id="comparison-content"></div>
+    </div>
+
+    <!-- Logs -->
+    <div class="grid-2" style="margin-top:1.5rem">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Greedy Execution Log</div>
+        <div class="log-box" id="greedy-log"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Dijkstra Execution Log</div>
+        <div class="log-box" id="dijkstra-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: Performance Graphs -->
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <h2>Performance Graphs</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Execution Time Comparison (ms)</div>
+      <div class="chart-wrap"><canvas id="chart-time"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--vip)"></span>Orders vs Execution Time Trend</div>
+      <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SAMPLE DATA -->
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <h2>Quick Start</h2>
+    <div class="section-line"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Load Sample Data</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem">Populate the system with a pre-built city delivery scenario (8 locations, 6 orders, 12 routes) to test all algorithms instantly.</p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+      <button class="btn btn-accent" onclick="loadSampleData()">🚀 Load Sample Dataset</button>
+      <button class="btn btn-ghost" onclick="clearAll()">🗑 Clear Everything</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let nodes   = [];   // string[]
+let edges   = [];   // [{from, to, dist}]
+let orders  = [];   // [{id, loc, weight, profit, priority}]
+let selectedOrders = []; // after knapsack
+
+// performance history for trend chart
+let perfHistory = { greedy:[], dijkstra:[], labels:[] };
+
+// chart instances
+let chartTime = null, chartTrend = null;
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  setTimeout(()=>t.className='', 2600);
+}
+
+function updateStats() {
+  document.getElementById('stat-nodes').textContent  = nodes.length;
+  document.getElementById('stat-orders').textContent = orders.length;
+  document.getElementById('stat-vip').textContent    = orders.filter(o=>o.priority==='vip').length;
+  document.getElementById('stat-edges').textContent  = edges.length;
+}
+
+function buildAdjacency() {
+  // Undirected weighted graph as adjacency map
+  const adj = {};
+  nodes.forEach(n => adj[n] = {});
+  edges.forEach(e => {
+    adj[e.from][e.to] = e.dist;
+    adj[e.to][e.from] = e.dist;
+  });
+  return adj;
+}
+
+function populateSelect(id, extras=[]) {
+  const sel = document.getElementById(id);
+  if(!sel) return;
+  const val = sel.value;
+  sel.innerHTML = `<option value="">Select</option>`;
+  [...extras, ...nodes].forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    if(n===val) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function refreshAllSelects() {
+  ['edge-from','edge-to','o-loc','depot-select'].forEach(id => populateSelect(id));
+}
+
+function renderNodeList() {
+  const el = document.getElementById('node-list');
+  if(nodes.length===0){ el.innerHTML='<div class="empty"><span class="emoji">📍</span>No locations yet</div>'; return; }
+  el.innerHTML = nodes.map(n=>`
+    <span class="route-node">${n}
+      <button onclick="removeNode('${n}')" style="background:none;border:none;color:var(--muted);cursor:pointer;margin-left:6px;font-size:0.7rem">✕</button>
+    </span>`).join('');
+}
+
+function renderEdgeTable() {
+  const tbody = document.getElementById('edge-body');
+  if(edges.length===0){ tbody.innerHTML=`<tr><td colspan="4" class="empty">No routes yet</td></tr>`; return; }
+  tbody.innerHTML = edges.map((e,i)=>`
+    <tr>
+      <td>${e.from}</td><td>${e.to}</td><td>${e.dist} km</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeEdge(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function renderOrderTable() {
+  const tbody = document.getElementById('order-body');
+  if(orders.length===0){
+    tbody.innerHTML=`<tr><td colspan="6" class="empty" style="padding:1.5rem"><span class="emoji">📦</span>No orders added</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = orders.map((o,i)=>`
+    <tr>
+      <td>${o.id}</td>
+      <td>${o.loc}</td>
+      <td>${o.weight} kg</td>
+      <td>₹${o.profit}</td>
+      <td><span class="badge ${o.priority==='vip'?'badge-vip':'badge-normal'}">${o.priority==='vip'?'⭐ VIP':'Normal'}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeOrder(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ADD / REMOVE NODES, EDGES, ORDERS
+// ═══════════════════════════════════════════════════════════════
+function addNode() {
+  const name = document.getElementById('node-name').value.trim();
+  if(!name) return toast('Enter a location name','error');
+  if(nodes.includes(name)) return toast('Location already exists','error');
+  nodes.push(name);
+  document.getElementById('node-name').value = '';
+  renderNodeList(); refreshAllSelects(); updateStats();
+  toast(`Location "${name}" added`);
+}
+
+function removeNode(name) {
+  nodes = nodes.filter(n=>n!==name);
+  edges = edges.filter(e=>e.from!==name && e.to!==name);
+  orders = orders.filter(o=>o.loc!==name);
+  renderNodeList(); renderEdgeTable(); renderOrderTable();
+  refreshAllSelects(); updateStats();
+  toast(`Removed "${name}"`,'error');
+}
+
+function addEdge() {
+  const from = document.getElementById('edge-from').value;
+  const to   = document.getElementById('edge-to').value;
+  const dist = parseFloat(document.getElementById('edge-dist').value);
+  if(!from||!to) return toast('Select both locations','error');
+  if(from===to)  return toast('From and To cannot be same','error');
+  if(!dist||dist<=0) return toast('Enter valid distance','error');
+  if(edges.find(e=>(e.from===from&&e.to===to)||(e.from===to&&e.to===from)))
+    return toast('Route already exists','error');
+  edges.push({from,to,dist});
+  document.getElementById('edge-dist').value='';
+  renderEdgeTable(); updateStats();
+  toast(`Route ${from} ↔ ${to} (${dist} km) added`);
+}
+
+function removeEdge(i) { edges.splice(i,1); renderEdgeTable(); updateStats(); }
+
+function addOrder() {
+  const id  = document.getElementById('o-id').value.trim();
+  const loc = document.getElementById('o-loc').value;
+  const weight = parseFloat(document.getElementById('o-weight').value);
+  const profit = parseFloat(document.getElementById('o-profit').value);
+  const priority = document.getElementById('o-priority').value;
+  if(!id)          return toast('Enter order ID','error');
+  if(!loc)         return toast('Select delivery location','error');
+  if(!weight||weight<=0) return toast('Enter valid weight','error');
+  if(!profit||profit<=0) return toast('Enter valid profit','error');
+  if(orders.find(o=>o.id===id)) return toast('Order ID already exists','error');
+  orders.push({id,loc,weight,profit,priority});
+  document.getElementById('o-id').value='';
+  document.getElementById('o-weight').value='';
+  document.getElementById('o-profit').value='';
+  renderOrderTable(); updateStats();
+  toast(`Order ${id} added${priority==='vip'?' (⭐ VIP)':''}`);
+}
+
+function removeOrder(i) { orders.splice(i,1); renderOrderTable(); updateStats(); }
+
+// ═══════════════════════════════════════════════════════════════
+//  ALGORITHM 1: 0/1 KNAPSACK
+//  ─ Time Complexity: O(n × W) where n = orders, W = capacity
+//  ─ Space Complexity: O(n × W)
+//  ─ Selects maximum-profit subset of orders within weight cap
+//  ─ VIP orders are pre-selected and their weight is deducted first
+// ═══════════════════════════════════════════════════════════════
+function runKnapsack() {
+  const cap = parseFloat(document.getElementById('knapsack-cap').value);
+  if(!cap||cap<=0) return toast('Enter valid capacity','error');
+  if(orders.length===0) return toast('Add orders first','error');
+
+  const resultEl = document.getElementById('knapsack-result');
+
+  // Separate VIP (must include) vs Normal orders
+  const vipOrders    = orders.filter(o=>o.priority==='vip');
+  const normalOrders = orders.filter(o=>o.priority==='normal');
+
+  // Calculate remaining capacity after mandatory VIP orders
+  const vipWeight = vipOrders.reduce((s,o)=>s+o.weight, 0);
+  const remaining  = cap - vipWeight;
+
+  let knapSelected = [...vipOrders]; // VIP always selected
+
+  if(remaining >= 0 && normalOrders.length > 0) {
+    // ── KNAPSACK DP TABLE ──
+    // dp[i][w] = max profit using first i normal orders with capacity w
+    const n = normalOrders.length;
+    const W = Math.floor(remaining * 10); // scale for decimal weights
+    const dp = Array.from({length:n+1}, ()=>new Array(W+1).fill(0));
+
+    for(let i=1;i<=n;i++) {
+      const wt = Math.floor(normalOrders[i-1].weight * 10);
+      const pr = normalOrders[i-1].profit;
+      for(let w=0;w<=W;w++) {
+        dp[i][w] = dp[i-1][w]; // don't take item i
+        if(w>=wt) dp[i][w] = Math.max(dp[i][w], dp[i-1][w-wt]+pr); // take item i
+      }
+    }
+
+    // Backtrack to find selected items
+    let w = W;
+    for(let i=n;i>=1;i--) {
+      if(dp[i][w]!==dp[i-1][w]) {
+        knapSelected.push(normalOrders[i-1]);
+        w -= Math.floor(normalOrders[i-1].weight*10);
+      }
+    }
+  }
+
+  selectedOrders = knapSelected;
+  const totalWeight  = knapSelected.reduce((s,o)=>s+o.weight,0);
+  const totalProfit  = knapSelected.reduce((s,o)=>s+o.profit,0);
+
+  // Render result
+  const rows = knapSelected.map(o=>`
+    <tr>
+      <td>${o.id}</td>
+      <td>${o.loc}</td>
+      <td>${o.weight} kg</td>
+      <td>₹${o.profit}</td>
+      <td><span class="badge ${o.priority==='vip'?'badge-vip':'badge-selected'}">${o.priority==='vip'?'⭐ VIP':'✓ Selected'}</span></td>
+    </tr>`).join('');
+
+  resultEl.innerHTML = `
+    <div class="result-block fade-in">
+      <h4>🎒 Knapsack Selection — O(n×W) Dynamic Programming</h4>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Location</th><th>Weight</th><th>Profit</th><th>Status</th></tr></thead>
+          <tbody>${rows||'<tr><td colspan="5">None selected</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="result-meta">
+        <div class="result-meta-item"><span class="lbl">Selected</span><span class="val" style="color:var(--green)">${knapSelected.length} / ${orders.length}</span></div>
+        <div class="result-meta-item"><span class="lbl">Total Weight</span><span class="val">${totalWeight.toFixed(1)} / ${cap} kg</span></div>
+        <div class="result-meta-item"><span class="lbl">Total Profit</span><span class="val" style="color:var(--accent)">₹${totalProfit}</span></div>
+        <div class="result-meta-item"><span class="lbl">VIP (Forced)</span><span class="val" style="color:var(--vip)">${vipOrders.length}</span></div>
+        <div class="result-meta-item"><span class="lbl">Normal Selected</span><span class="val">${knapSelected.length-vipOrders.length}</span></div>
+      </div>
+    </div>`;
+
+  toast(`Knapsack complete — ${knapSelected.length} orders selected`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ALGORITHM 2: GREEDY — NEAREST NEIGHBOR
+//  ─ Time Complexity: O(n²)  Space: O(n)
+//  ─ Start at depot, always visit nearest unvisited delivery node
+//  ─ VIP orders are forced to front of queue before nearest-neighbor
+// ═══════════════════════════════════════════════════════════════
+function greedyRoute(depot, deliveryNodes, adj) {
+  const log = [];
+  log.push(`<span class="log-step">[GREEDY] Start at depot: ${depot}</span>`);
+  log.push(`<span class="log-step">VIP-first priority applied</span>`);
+
+  // Separate VIP delivery nodes from normal
+  const vipNodes    = deliveryNodes.filter(n => orders.find(o=>o.loc===n&&o.priority==='vip'));
+  const normalNodes = deliveryNodes.filter(n => !vipNodes.includes(n));
+
+  log.push(`<span class="log-vip">[VIP] Must deliver first: [${vipNodes.join(', ')}]</span>`);
+
+  const route = [depot];
+  let totalDist = 0;
+  let current = depot;
+
+  // Helper: shortest distance between two nodes using BFS over adjacency
+  function directDist(a, b) {
+    return adj[a] && adj[a][b] ? adj[a][b] : (adj[b] && adj[b][a] ? adj[b][a] : Infinity);
+  }
+
+  // ── Phase 1: VIP deliveries (in nearest-neighbor order among VIPs) ──
+  const vipRemaining = [...vipNodes];
+  while(vipRemaining.length > 0) {
+    let nearest = null, minD = Infinity;
+    vipRemaining.forEach(n => {
+      const d = directDist(current, n);
+      if(d < minD) { minD=d; nearest=n; }
+    });
+    if(nearest===null || minD===Infinity) {
+      log.push(`<span class="log-warn">[WARN] Cannot reach VIP node from ${current}</span>`);
+      break;
+    }
+    route.push(nearest);
+    totalDist += minD;
+    log.push(`<span class="log-vip">[VIP] ${current} → ${nearest} (${minD} km)</span>`);
+    vipRemaining.splice(vipRemaining.indexOf(nearest),1);
+    current = nearest;
+  }
+
+  // ── Phase 2: Normal deliveries (nearest-neighbor) ──
+  const normalRemaining = [...normalNodes];
+  while(normalRemaining.length > 0) {
+    let nearest = null, minD = Infinity;
+    normalRemaining.forEach(n => {
+      const d = directDist(current, n);
+      if(d < minD) { minD=d; nearest=n; }
+    });
+    if(nearest===null || minD===Infinity) {
+      log.push(`<span class="log-warn">[WARN] Cannot reach node from ${current}</span>`);
+      break;
+    }
+    route.push(nearest);
+    totalDist += minD;
+    log.push(`<span class="log-step">[NORMAL] ${current} → ${nearest} (${minD} km)</span>`);
+    normalRemaining.splice(normalRemaining.indexOf(nearest),1);
+    current = nearest;
+  }
+
+  // Return to depot
+  const returnDist = directDist(current, depot);
+  if(returnDist !== Infinity) {
+    totalDist += returnDist;
+    route.push(depot);
+    log.push(`<span class="log-ok">[DONE] Return to depot: ${current} → ${depot} (${returnDist} km)</span>`);
+  }
+  log.push(`<span class="log-ok">[GREEDY] Total distance: ${totalDist} km</span>`);
+  return { route, totalDist, log };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ALGORITHM 3: DIJKSTRA'S SHORTEST PATH
+//  ─ Time Complexity: O((V + E) log V)  Space: O(V)
+//  ─ Finds true shortest path between all pairs of delivery nodes
+//  ─ Builds optimal route respecting VIP priority ordering
+// ═══════════════════════════════════════════════════════════════
+function dijkstra(source, adj) {
+  // Returns {dist, prev} from source to all reachable nodes
+  const dist = {};
+  const prev = {};
+  const visited = new Set();
+
+  nodes.forEach(n => { dist[n] = Infinity; prev[n] = null; });
+  dist[source] = 0;
+
+  // Simple priority queue (min-heap simulation with array)
+  // For production use a binary heap; this is O((V²) worst case)
+  const pq = [[0, source]]; // [distance, node]
+
+  while(pq.length > 0) {
+    // Extract minimum
+    pq.sort((a,b) => a[0]-b[0]);
+    const [d, u] = pq.shift();
+
+    if(visited.has(u)) continue;
+    visited.add(u);
+
+    // Relax neighbors
+    if(adj[u]) {
+      Object.entries(adj[u]).forEach(([v, w]) => {
+        const newDist = d + w;
+        if(newDist < dist[v]) {
+          dist[v] = newDist;
+          prev[v] = u;
+          pq.push([newDist, v]);
+        }
+      });
+    }
+  }
+  return { dist, prev };
+}
+
+function reconstructPath(prev, src, dst) {
+  const path = [];
+  let cur = dst;
+  while(cur !== null && cur !== undefined) {
+    path.unshift(cur);
+    if(cur === src) break;
+    cur = prev[cur];
+  }
+  return (path[0]===src) ? path : [];
+}
+
+function dijkstraRoute(depot, deliveryNodes, adj) {
+  const log = [];
+  log.push(`<span class="log-step">[DIJKSTRA] Computing shortest paths from all nodes</span>`);
+
+  // Pre-compute shortest paths from depot and all delivery nodes
+  const allSources = [depot, ...deliveryNodes];
+  const shortestPaths = {};
+  allSources.forEach(src => {
+    shortestPaths[src] = dijkstra(src, adj);
+    log.push(`<span class="log-step">[DIJKSTRA] Processed source: ${src}</span>`);
+  });
+
+  // Build route: VIP first (sorted by shortest dist from depot), then normal
+  const vipNodes    = deliveryNodes.filter(n => orders.find(o=>o.loc===n&&o.priority==='vip'));
+  const normalNodes = deliveryNodes.filter(n => !vipNodes.includes(n));
+
+  log.push(`<span class="log-vip">[VIP] Priority queue: [${vipNodes.join(', ')}]</span>`);
+
+  const route = [depot];
+  let totalDist = 0;
+  let current = depot;
+
+  function visitNext(remaining) {
+    let nearest = null, minD = Infinity;
+    remaining.forEach(n => {
+      const d = shortestPaths[current]?.dist[n] ?? Infinity;
+      if(d < minD) { minD=d; nearest=n; }
+    });
+    return { nearest, minD };
+  }
+
+  // ── VIP phase ──
+  const vipRem = [...vipNodes];
+  while(vipRem.length > 0) {
+    const {nearest, minD} = visitNext(vipRem);
+    if(!nearest || minD===Infinity) { log.push(`<span class="log-warn">[WARN] VIP node unreachable</span>`); break; }
+    totalDist += minD;
+    const path = reconstructPath(shortestPaths[current].prev, current, nearest);
+    route.push(...path.slice(1));
+    log.push(`<span class="log-vip">[VIP] ${current} → ${nearest} = ${minD} km (via ${path.join('→')})</span>`);
+    vipRem.splice(vipRem.indexOf(nearest),1);
+    current = nearest;
+  }
+
+  // ── Normal phase ──
+  const normRem = [...normalNodes];
+  while(normRem.length > 0) {
+    const {nearest, minD} = visitNext(normRem);
+    if(!nearest || minD===Infinity) { log.push(`<span class="log-warn">[WARN] Node unreachable</span>`); break; }
+    totalDist += minD;
+    const path = reconstructPath(shortestPaths[current].prev, current, nearest);
+    route.push(...path.slice(1));
+    log.push(`<span class="log-step">[NORMAL] ${current} → ${nearest} = ${minD} km</span>`);
+    normRem.splice(normRem.indexOf(nearest),1);
+    current = nearest;
+  }
+
+  // Return to depot
+  const returnDist = shortestPaths[current]?.dist[depot] ?? Infinity;
+  if(returnDist !== Infinity) {
+    const retPath = reconstructPath(shortestPaths[current].prev, current, depot);
+    route.push(...retPath.slice(1));
+    totalDist += returnDist;
+    log.push(`<span class="log-ok">[DONE] Return to depot: ${returnDist} km</span>`);
+  }
+  log.push(`<span class="log-ok">[DIJKSTRA] Total distance: ${totalDist} km</span>`);
+  return { route, totalDist, log };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER ROUTE
+// ═══════════════════════════════════════════════════════════════
+function renderRoute(route, containerId, adj) {
+  const el = document.getElementById(containerId);
+  const vipLocs = orders.filter(o=>o.priority==='vip').map(o=>o.loc);
+  let html = '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-top:0.5rem">';
+  route.forEach((n,i) => {
+    const isVip   = vipLocs.includes(n);
+    const isDepot = i===0 || i===route.length-1;
+    html += `<span class="route-node ${isVip&&!isDepot?'vip':''} ${isDepot?'depot':''}">${isDepot?'🏭 ':isVip?'⭐ ':'📦 '}${n}</span>`;
+    if(i<route.length-1) html += `<span class="route-arrow">→</span>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RUN FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+function getDepotAndDeliveries() {
+  const depot = document.getElementById('depot-select').value;
+  if(!depot) { toast('Select a depot first','error'); return null; }
+  if(selectedOrders.length===0) { toast('Run Knapsack selection first','error'); return null; }
+  const adj = buildAdjacency();
+  const deliveryNodes = [...new Set(selectedOrders.map(o=>o.loc).filter(l=>l!==depot))];
+  return { depot, deliveryNodes, adj };
+}
+
+function runGreedy() {
+  const data = getDepotAndDeliveries(); if(!data) return;
+  const { depot, deliveryNodes, adj } = data;
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('algo-greedy').classList.add('active');
+
+  const t0 = performance.now();
+  const { route, totalDist, log } = greedyRoute(depot, deliveryNodes, adj);
+  const elapsed = (performance.now() - t0).toFixed(3);
+
+  renderRoute(route, 'greedy-route', adj);
+  document.getElementById('greedy-meta').innerHTML = metaHtml(route, totalDist, elapsed, 'O(n²)', 'Greedy');
+  document.getElementById('greedy-log').innerHTML = log.join('<br>');
+
+  recordPerf('greedy', parseFloat(elapsed));
+  updateCharts();
+  toast(`Greedy route: ${totalDist} km in ${elapsed} ms`);
+}
+
+function runDijkstra() {
+  const data = getDepotAndDeliveries(); if(!data) return;
+  const { depot, deliveryNodes, adj } = data;
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('algo-dijkstra').classList.add('active');
+
+  const t0 = performance.now();
+  const { route, totalDist, log } = dijkstraRoute(depot, deliveryNodes, adj);
+  const elapsed = (performance.now() - t0).toFixed(3);
+
+  renderRoute(route, 'dijkstra-route', adj);
+  document.getElementById('dijkstra-meta').innerHTML = metaHtml(route, totalDist, elapsed, 'O((V+E)logV)', 'Dijkstra');
+  document.getElementById('dijkstra-log').innerHTML = log.join('<br>');
+
+  recordPerf('dijkstra', parseFloat(elapsed));
+  updateCharts();
+  toast(`Dijkstra route: ${totalDist} km in ${elapsed} ms`);
+}
+
+function runBoth() {
+  const data = getDepotAndDeliveries(); if(!data) return;
+  const { depot, deliveryNodes, adj } = data;
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('algo-both').classList.add('active');
+
+  const t0g = performance.now();
+  const g = greedyRoute(depot, deliveryNodes, adj);
+  const gTime = (performance.now()-t0g).toFixed(3);
+
+  const t0d = performance.now();
+  const d = dijkstraRoute(depot, deliveryNodes, adj);
+  const dTime = (performance.now()-t0d).toFixed(3);
+
+  renderRoute(g.route, 'greedy-route', adj);
+  renderRoute(d.route, 'dijkstra-route', adj);
+  document.getElementById('greedy-meta').innerHTML = metaHtml(g.route, g.totalDist, gTime, 'O(n²)', 'Greedy');
+  document.getElementById('dijkstra-meta').innerHTML = metaHtml(d.route, d.totalDist, dTime, 'O((V+E)logV)', 'Dijkstra');
+  document.getElementById('greedy-log').innerHTML = g.log.join('<br>');
+  document.getElementById('dijkstra-log').innerHTML = d.log.join('<br>');
+
+  renderComparison(g, d, gTime, dTime);
+  recordPerf('greedy', parseFloat(gTime));
+  recordPerf('dijkstra', parseFloat(dTime));
+  recordPerf('label', selectedOrders.length + ' orders');
+  updateCharts();
+  toast('Comparison complete!');
+}
+
+function metaHtml(route, dist, elapsed, complexity, algo) {
+  return `
+    <div class="result-meta-item"><span class="lbl">Stops</span><span class="val">${route.length}</span></div>
+    <div class="result-meta-item"><span class="lbl">Total Distance</span><span class="val" style="color:var(--accent)">${dist === Infinity ? '∞' : dist+' km'}</span></div>
+    <div class="result-meta-item"><span class="lbl">Time Taken</span><span class="val" style="color:var(--blue)">${elapsed} ms</span></div>
+    <div class="result-meta-item"><span class="lbl">Complexity</span><span class="val" style="color:var(--muted);font-size:0.72rem">${complexity}</span></div>`;
+}
+
+function renderComparison(g, d, gTime, dTime) {
+  const gWins = g.totalDist <= d.totalDist;
+  const dFaster = parseFloat(dTime) <= parseFloat(gTime);
+
+  document.getElementById('comparison-content').innerHTML = `
+    <div class="cmp-box cmp-greedy">
+      <h4 style="color:var(--blue)">⚡ Greedy — Nearest Neighbor</h4>
+      <div style="font-size:0.78rem;color:var(--muted);line-height:1.8">
+        <div>Distance: <strong style="color:var(--text)">${g.totalDist} km</strong></div>
+        <div>Time: <strong style="color:var(--text)">${gTime} ms</strong></div>
+        <div>Stops: <strong style="color:var(--text)">${g.route.length}</strong></div>
+        <div style="margin-top:8px;font-size:0.72rem">
+          ✅ Faster execution<br>
+          ❌ May not find shortest path<br>
+          ✅ Good for real-time decisions<br>
+          ❌ Greedy choices can backfire
+        </div>
+      </div>
+      <div class="winner">${gWins?'🏆 Better distance':'📍 Suboptimal distance'}</div>
+    </div>
+    <div class="cmp-box cmp-dijkstra">
+      <h4 style="color:var(--green)">🔭 Dijkstra's Algorithm</h4>
+      <div style="font-size:0.78rem;color:var(--muted);line-height:1.8">
+        <div>Distance: <strong style="color:var(--text)">${d.totalDist} km</strong></div>
+        <div>Time: <strong style="color:var(--text)">${dTime} ms</strong></div>
+        <div>Stops: <strong style="color:var(--text)">${d.route.length}</strong></div>
+        <div style="margin-top:8px;font-size:0.72rem">
+          ✅ Guaranteed shortest path<br>
+          ❌ Higher computation cost<br>
+          ✅ Best for planning phase<br>
+          ❌ Slower on large graphs
+        </div>
+      </div>
+      <div class="winner">${!gWins?'🏆 Better distance':dFaster?'⚡ Faster execution':'📍 Guarantees optimality'}</div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PERFORMANCE CHARTS
+// ═══════════════════════════════════════════════════════════════
+function recordPerf(type, val) {
+  if(type==='greedy')   perfHistory.greedy.push(val);
+  if(type==='dijkstra') perfHistory.dijkstra.push(val);
+  if(type==='label')    perfHistory.labels.push(val);
+}
+
+function updateCharts() {
+  const gLast = perfHistory.greedy.slice(-1)[0]??0;
+  const dLast = perfHistory.dijkstra.slice(-1)[0]??0;
+
+  // Chart 1: Bar — latest run comparison
+  if(chartTime) chartTime.destroy();
+  chartTime = new Chart(document.getElementById('chart-time'), {
+    type: 'bar',
+    data: {
+      labels: ['Greedy (Nearest Neighbor)', "Dijkstra's Algorithm"],
+      datasets: [{
+        label: 'Execution Time (ms)',
+        data: [gLast, dLast],
+        backgroundColor: ['rgba(96,165,250,0.7)', 'rgba(52,211,153,0.7)'],
+        borderColor: ['#60a5fa','#34d399'],
+        borderWidth: 2, borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx=>`${ctx.parsed.y.toFixed(3)} ms` } } },
+      scales: {
+        x: { ticks: { color:'#6b7280', font:{family:'Space Mono',size:11} }, grid:{color:'#1a1f2a'} },
+        y: { ticks: { color:'#6b7280', font:{family:'Space Mono',size:10} }, grid:{color:'#1a1f2a'}, beginAtZero:true }
+      }
+    }
+  });
+
+  // Chart 2: Line — trend over multiple runs
+  if(chartTrend) chartTrend.destroy();
+  const runLabels = perfHistory.greedy.map((_,i)=>`Run ${i+1}`);
+  chartTrend = new Chart(document.getElementById('chart-trend'), {
+    type: 'line',
+    data: {
+      labels: runLabels,
+      datasets: [
+        {
+          label: 'Greedy (ms)', data: perfHistory.greedy,
+          borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.08)',
+          tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor:'#60a5fa'
+        },
+        {
+          label: "Dijkstra (ms)", data: perfHistory.dijkstra,
+          borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.08)',
+          tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor:'#34d399'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color:'#8fa0b0', font:{family:'Space Mono',size:11} } },
+        tooltip: { callbacks: { label: ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)} ms` } }
+      },
+      scales: {
+        x: { ticks:{color:'#6b7280',font:{family:'Space Mono',size:10}}, grid:{color:'#1a1f2a'} },
+        y: { ticks:{color:'#6b7280',font:{family:'Space Mono',size:10}}, grid:{color:'#1a1f2a'}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+// Initialize empty charts
+function initCharts() {
+  chartTime = new Chart(document.getElementById('chart-time'), {
+    type: 'bar',
+    data: { labels:['Greedy','Dijkstra'], datasets:[{label:'ms',data:[0,0],backgroundColor:['rgba(96,165,250,0.4)','rgba(52,211,153,0.4)'],borderRadius:8}] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#6b7280'},grid:{color:'#1a1f2a'}},y:{ticks:{color:'#6b7280'},grid:{color:'#1a1f2a'},beginAtZero:true}}
+    }
+  });
+  chartTrend = new Chart(document.getElementById('chart-trend'), {
+    type: 'line',
+    data: { labels:['—'], datasets:[{label:'Greedy',data:[0],borderColor:'#60a5fa'},{label:'Dijkstra',data:[0],borderColor:'#34d399'}] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8fa0b0'}}},
+      scales:{x:{ticks:{color:'#6b7280'},grid:{color:'#1a1f2a'}},y:{ticks:{color:'#6b7280'},grid:{color:'#1a1f2a'},beginAtZero:true}}
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SAMPLE DATA
+// ═══════════════════════════════════════════════════════════════
+function loadSampleData() {
+  clearAll(false);
+
+  // 8 locations (city delivery scenario)
+  ['Depot (Hub)', 'Karol Bagh', 'Lajpat Nagar', 'Connaught Place',
+   'Dwarka', 'Rohini', 'Saket', 'Noida Sector 18'].forEach(n => nodes.push(n));
+
+  // Routes (undirected edges)
+  edges = [
+    {from:'Depot (Hub)', to:'Karol Bagh',        dist:5},
+    {from:'Depot (Hub)', to:'Connaught Place',    dist:7},
+    {from:'Depot (Hub)', to:'Rohini',             dist:12},
+    {from:'Karol Bagh',  to:'Connaught Place',    dist:4},
+    {from:'Karol Bagh',  to:'Lajpat Nagar',       dist:10},
+    {from:'Connaught Place', to:'Lajpat Nagar',   dist:8},
+    {from:'Connaught Place', to:'Dwarka',          dist:15},
+    {from:'Connaught Place', to:'Saket',           dist:9},
+    {from:'Lajpat Nagar', to:'Saket',             dist:5},
+    {from:'Lajpat Nagar', to:'Noida Sector 18',   dist:13},
+    {from:'Rohini',      to:'Dwarka',              dist:18},
+    {from:'Saket',       to:'Noida Sector 18',     dist:14},
+  ];
+
+  // 6 orders
+  orders = [
+    {id:'ORD-001', loc:'Karol Bagh',      weight:3,  profit:150, priority:'vip'},
+    {id:'ORD-002', loc:'Lajpat Nagar',    weight:8,  profit:300, priority:'normal'},
+    {id:'ORD-003', loc:'Connaught Place', weight:2,  profit:200, priority:'vip'},
+    {id:'ORD-004', loc:'Dwarka',          weight:12, profit:500, priority:'normal'},
+    {id:'ORD-005', loc:'Rohini',          weight:5,  profit:180, priority:'normal'},
+    {id:'ORD-006', loc:'Saket',           weight:7,  profit:350, priority:'normal'},
+  ];
+
+  document.getElementById('knapsack-cap').value = '25';
+  document.getElementById('depot-select').value = '';
+
+  renderNodeList(); renderEdgeTable(); renderOrderTable();
+  refreshAllSelects();
+  updateStats();
+
+  // Auto-set depot after refresh
+  setTimeout(() => {
+    document.getElementById('depot-select').value = 'Depot (Hub)';
+  }, 50);
+
+  toast('Sample data loaded! Run Knapsack → then an algorithm.');
+}
+
+function clearAll(showToast=true) {
+  nodes=[]; edges=[]; orders=[]; selectedOrders=[];
+  perfHistory={greedy:[],dijkstra:[],labels:[]};
+  renderNodeList(); renderEdgeTable(); renderOrderTable();
+  refreshAllSelects(); updateStats();
+  document.getElementById('knapsack-result').innerHTML='';
+  document.getElementById('results-section').style.display='none';
+  ['algo-greedy','algo-dijkstra','algo-both'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  initCharts();
+  if(showToast) toast('Cleared!','error');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+window.onload = () => { initCharts(); };
+</script>
+</body>
+</html>
