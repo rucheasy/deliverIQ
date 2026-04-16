@@ -1,15 +1,3 @@
-"""
-DeliverIQ — Delivery Route Optimization Backend
-================================================
-Flask REST API exposing three core algorithms:
-  1. Greedy Nearest Neighbor  — O(n²)
-  2. Dijkstra Shortest Path   — O((V+E) log V)
-  3. 0/1 Knapsack             — O(n × W)
-
-Run:
-    pip install flask flask-cors
-    python app.py
-"""
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -20,9 +8,9 @@ import heapq
 app = Flask(__name__)
 CORS(app)  # Allow frontend to call from any origin
 
-# ═══════════════════════════════════════════════════════════════
+
 #  UTILITY — Build adjacency dict from edge list
-# ═══════════════════════════════════════════════════════════════
+
 def build_adjacency(nodes: list, edges: list) -> dict:
     """Convert edge list to undirected weighted adjacency dictionary."""
     adj = {n: {} for n in nodes}
@@ -32,13 +20,13 @@ def build_adjacency(nodes: list, edges: list) -> dict:
     return adj
 
 
-# ═══════════════════════════════════════════════════════════════
+
 #  ALGORITHM 1 — GREEDY NEAREST NEIGHBOR
 #  ─ Always move to closest unvisited delivery node
 #  ─ VIP orders are served first (forced priority phase)
 #  ─ Time Complexity : O(n²)
 #  ─ Space Complexity: O(n)
-# ═══════════════════════════════════════════════════════════════
+
 def greedy_route(depot: str, delivery_nodes: list, adj: dict, vip_locs: set):
     log = [f"[GREEDY] Depot: {depot}", f"[GREEDY] VIP-first enabled"]
 
@@ -97,13 +85,13 @@ def greedy_route(depot: str, delivery_nodes: list, adj: dict, vip_locs: set):
     return {"route": route, "total_dist": total_dist, "log": log}
 
 
-# ═══════════════════════════════════════════════════════════════
+
 #  ALGORITHM 2 — DIJKSTRA'S ALGORITHM
 #  ─ Finds true shortest path between all node pairs
 #  ─ Uses min-heap priority queue for efficiency
 #  ─ Time Complexity : O((V + E) log V)
 #  ─ Space Complexity: O(V)
-# ═══════════════════════════════════════════════════════════════
+
 def dijkstra(source: str, adj: dict, all_nodes: list):
     """Return shortest distances and predecessors from source."""
     dist = {n: math.inf for n in all_nodes}
@@ -208,14 +196,12 @@ def dijkstra_route(depot: str, delivery_nodes: list, adj: dict,
     log.append(f"[DIJKSTRA] Total: {total_dist} km")
     return {"route": route, "total_dist": total_dist, "log": log}
 
-
-# ══════════════════════════════════════════════════════════
 #  ALGORITHM 3 — 0/1 KNAPSACK (Dynamic Programming)
 #  ─ VIP orders are mandatory (always selected)
 #  ─ Normal orders selected to maximize profit within capacity
 #  ─ Time Complexity : O(n × W)
 #  ─ Space Complexity: O(n × W)
-# ═══════════════════════════════════════════════════════════════
+
 def knapsack_01(orders: list, capacity: float):
     """
     Solve 0/1 knapsack.
@@ -268,9 +254,7 @@ def knapsack_01(orders: list, capacity: float):
     }
 
 
-# ═══════════════════════════════════════════════════════════════
 #  API ROUTES
-# ═══════════════════════════════════════════════════════════════
 
 @app.route("/api/health", methods=["GET"])
 def health():
